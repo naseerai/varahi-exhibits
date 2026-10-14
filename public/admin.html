@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141414">
+  <title>Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <a class="brand" href="/admin" data-brand></a>
+      <button class="nav-item active" data-tab="events" data-icon="grid">Events</button>
+      <button class="nav-item" data-tab="payments" data-icon="rupee">Payments</button>
+      <button class="nav-item" data-tab="staff" data-icon="users">Team &amp; staff</button>
+      <a class="nav-item" href="/scan" data-icon="scan">Entry scanner</a>
+      <a class="nav-item" href="/" target="_blank" data-icon="external">View website</a>
+      <div class="sidebar-foot">
+        <div class="me"><span class="avatar me-avatar"></span><div><span class="me-name"></span><small>Administrator</small></div></div>
+        <button class="nav-item change-pw" data-icon="key">Change password</button>
+        <button class="nav-item" data-action="logout" data-icon="logout">Log out</button>
+      </div>
+    </aside>
+
+    <div>
+      <header class="topbar">
+        <a class="brand" href="/admin" data-brand></a>
+        <span class="spacer"></span>
+        <button class="btn ghost icon-only change-pw" aria-label="Change password" data-icon="key"></button>
+        <button class="btn ghost icon-only" aria-label="Log out" data-action="logout" data-icon="logout"></button>
+      </header>
+
+      <main class="app-main">
+        <div id="error" class="alert error hidden" style="margin-bottom:16px"></div>
+
+        <!-- ===== Events ===== -->
+        <section id="tab-events">
+          <div class="page-head">
+            <div><h1>Events</h1><p class="muted">Create events, set ticket categories and track sales.</p></div>
+            <span class="spacer"></span>
+            <button class="btn primary" id="new-event" data-icon="plus">New event</button>
+          </div>
+          <div class="kpis" id="overview"></div>
+          <div class="admin-events" id="events-list"></div>
+          <div id="no-events" class="card empty hidden">
+            <h3>No events yet</h3>
+            <p style="margin:6px 0 16px">Create your first event to start selling tickets.</p>
+            <button class="btn primary" data-action="new-event">Create event</button>
+          </div>
+        </section>
+
+        <!-- ===== Bookings for one event ===== -->
+        <section id="tab-bookings" class="hidden">
+          <div class="page-head">
+            <button class="btn ghost icon-only" id="back" aria-label="Back to events" data-icon="arrowLeft"></button>
+            <div style="min-width:0;flex:1"><h1 id="b-title"></h1><p class="muted" id="b-sub"></p></div>
+            <a class="btn ghost" id="b-export" data-icon="download">Export CSV</a>
+          </div>
+          <div class="kpis" id="b-stats"></div>
+
+          <h2 style="margin-bottom:12px">Ticket categories</h2>
+          <div class="table-card" style="margin-bottom:28px">
+            <table class="rtable">
+              <thead><tr><th>Category</th><th>Price</th><th>Sold</th><th>Entered</th><th>Revenue</th></tr></thead>
+              <tbody id="b-cats"></tbody>
+            </table>
+          </div>
+
+          <h2 style="margin-bottom:12px">Bookings</h2>
+          <div class="toolbar">
+            <div class="search"><span data-icon="search"></span><input id="b-search" type="search" placeholder="Search name, phone, email or ticket ID"></div>
+            <select id="b-status" aria-label="Filter by payment status"><option value="paid">Paid</option><option value="pending">Pending</option><option value="cancelled">Cancelled</option><option value="">All payments</option></select>
+            <select id="b-entry" aria-label="Filter by entry"><option value="">Any entry</option><option value="none">Not entered</option><option value="partial">Partly entered</option><option value="all">All entered</option></select>
+          </div>
+          <div class="table-card">
+            <table class="rtable">
+              <thead><tr><th>#</th><th>Booked by</th><th>People</th><th>Amount</th><th>Payment</th><th>Entry</th><th></th></tr></thead>
+              <tbody id="b-body"></tbody>
+            </table>
+          </div>
+          <div id="b-empty" class="card empty hidden">No bookings found.</div>
+        </section>
+
+        <!-- ===== Payments ===== -->
+        <section id="tab-payments" class="hidden">
+          <div class="page-head">
+            <div><h1>Payments</h1><p class="muted">Connect Razorpay and/or Cashfree, pick the default, and choose a different one per event if you like.</p></div>
+          </div>
+          <div id="pay-note" class="alert warn hidden" style="margin-bottom:16px"></div>
+          <div id="gateways" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px;align-items:start"></div>
+          <div class="card" style="margin-top:20px">
+            <h2 style="margin-bottom:8px">How to connect a gateway</h2>
+            <ol class="muted" style="margin:0;padding-left:20px;display:grid;gap:6px">
+              <li>Put its keys in the <code>.env</code> file on the server (see <code>.env.example</code>) and restart the app.</li>
+              <li>In the gateway's dashboard, add the <b>webhook URL</b> shown above, so tickets are issued even if a customer closes the browser after paying.</li>
+              <li>Use test/sandbox keys first. Switch to live keys when you're ready to take real money.</li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- ===== Staff ===== -->
+        <section id="tab-staff" class="hidden">
+          <div class="page-head">
+            <div><h1>Team &amp; staff</h1><p class="muted">Staff can only use the entry scanner. Admins can manage everything.</p></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px;align-items:start">
+            <div class="table-card">
+              <table class="rtable">
+                <thead><tr><th>Name</th><th>Username</th><th>Role</th><th></th></tr></thead>
+                <tbody id="users-body"></tbody>
+              </table>
+            </div>
+            <div class="card">
+              <h2 style="margin-bottom:16px">Add team member</h2>
+              <div id="user-error" class="alert error hidden" style="margin-bottom:14px"></div>
+              <form id="user-form" class="stack">
+                <div><label>Full name</label><input name="name" required></div>
+                <div><label>Username</label><input name="username" autocapitalize="none" spellcheck="false" required></div>
+                <div><label>Password <span class="muted">(min 8 characters)</span></label><input name="password" type="password" minlength="8" autocomplete="new-password" required></div>
+                <div><label>Role</label><select name="role"><option value="staff">Staff — scanner only</option><option value="admin">Admin — full access</option></select></div>
+                <button class="btn primary block" data-icon="plus">Add member</button>
+              </form>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="active" data-tab="events" data-icon="grid" data-icon-class="lg">Events</button>
+    <button data-tab="payments" data-icon="rupee" data-icon-class="lg">Payments</button>
+    <button data-tab="staff" data-icon="users" data-icon-class="lg">Team</button>
+    <a href="/scan" data-icon="scan" data-icon-class="lg">Scan</a>
+    <a href="/" target="_blank" data-icon="external" data-icon-class="lg">Website</a>
+  </nav>
+
+  <!-- ===== Event editor ===== -->
+  <dialog id="event-dialog">
+    <form id="event-form" class="dlg">
+      <div class="dlg-head"><h2 id="ed-title">New event</h2><span class="spacer"></span><button type="button" class="btn ghost icon-only" id="ed-x" aria-label="Close" data-icon="x"></button></div>
+      <div class="dlg-body">
+        <div id="ed-error" class="alert error hidden"></div>
+        <div class="form-grid">
+          <div class="full"><label>Event title *</label><input name="title" required placeholder="e.g. New Year Music Night"></div>
+          <div><label>Date &amp; time *</label><input name="startsAt" type="datetime-local" required></div>
+          <div><label>Venue</label><input name="venue" placeholder="Hall, city"></div>
+          <div><label>Total capacity <span class="muted">(0 = unlimited)</span></label><input name="capacity" type="number" inputmode="numeric" min="0" step="1" value="0"></div>
+          <div><label>Payment gateway</label><select name="paymentGateway" id="ed-gateway"></select></div>
+          <div class="full">
+            <span class="label">Cover image</span>
+            <label class="uploader" id="uploader" for="img-file">
+              <img id="img-preview" alt="" hidden>
+              <span class="uploader-empty" id="uploader-empty">
+                <span class="uploader-icon" data-icon="image" data-icon-class="lg"></span>
+                <b>Tap to upload a cover image</b>
+                <span class="muted small">or drag &amp; drop · JPG, PNG or WebP · resized automatically</span>
+              </span>
+              <span class="uploader-busy hidden" id="uploader-busy">Uploading…</span>
+            </label>
+            <input type="file" id="img-file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+            <div class="row hidden" id="img-actions" style="margin-top:10px">
+              <label for="img-file" class="btn ghost sm" style="margin:0" data-icon="image">Change image</label>
+              <button type="button" class="btn danger-ghost sm" id="img-remove" data-icon="trash">Remove</button>
+            </div>
+            <input type="hidden" name="imageUrl">
+          </div>
+          <div class="full"><label>Description</label><textarea name="description" rows="3" placeholder="What should guests know?"></textarea></div>
+        </div>
+        <div>
+          <div class="row"><h3>Ticket categories</h3><span class="spacer"></span><button type="button" class="btn soft sm" id="add-cat" data-icon="plus">Add category</button></div>
+          <p class="muted small" style="margin-top:4px">e.g. VIP, Gold, General. Price 0 = free. Seats 0 = no separate limit.</p>
+          <div id="cats"></div>
+        </div>
+        <label class="check"><input type="checkbox" name="isActive" checked> Visible on the website (bookings open)</label>
+      </div>
+      <div class="dlg-foot">
+        <button type="button" class="btn danger-ghost hidden" id="ed-delete" data-icon="trash">Delete</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" id="ed-cancel">Cancel</button>
+        <button class="btn primary">Save event</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="booking-dialog">
+    <div class="dlg">
+      <div class="dlg-head"><h2 id="bd-title"></h2><span class="spacer"></span><button class="btn ghost icon-only" aria-label="Close" data-action="close-dialog" data-icon="x"></button></div>
+      <div class="dlg-body" id="bd-body"></div>
+    </div>
+  </dialog>
+
+  <dialog id="pw-dialog" class="sm">
+    <form id="pw-form" class="dlg">
+      <div class="dlg-head"><h2>Change password</h2></div>
+      <div class="dlg-body">
+        <div id="pw-error" class="alert error hidden"></div>
+        <div><label>Current password</label><input name="current" type="password" autocomplete="current-password" required></div>
+        <div><label>New password <span class="muted">(min 8)</span></label><input name="next" type="password" minlength="8" autocomplete="new-password" required></div>
+      </div>
+      <div class="dlg-foot"><span class="spacer"></span><button type="button" class="btn ghost" data-action="close-dialog">Cancel</button><button class="btn primary">Save</button></div>
+    </form>
+  </dialog>
+
+  <script src="/common.js"></script>
+  <script>
+    let me, events = [], editing = null, currentEvent = null, bookings = [];
+    const initials = (n) => n.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+    const pct = (a, b) => (b ? Math.min(100, Math.round((a / b) * 100)) : 0);
+    const kpi = (iconName, label, value) => `<div class="kpi"><span class="kpi-label">${icon(iconName)}${esc(label)}</span><span class="kpi-value">${value}</span></div>`;
+    const rupees = (n, cur) => esc(amount(n, cur));
+
+    // ----- navigation -----
+    function showTab(name) {
+      for (const s of ['events', 'bookings', 'payments', 'staff']) $(`#tab-${s}`).classList.toggle('hidden', s !== name);
+      const active = name === 'bookings' ? 'events' : name;
+      document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === active));
+      window.scrollTo({ top: 0 });
+    }
+    document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => {
+      showTab(b.dataset.tab);
+      if (b.dataset.tab === 'staff') loadUsers();
+      else if (b.dataset.tab === 'payments') loadPayments();
+      else loadEvents();
+    }));
+
+    // ----- events -----
+    async function loadEvents() {
+      try {
+        events = await api('/api/admin/events');
+        const cur = events[0]?.currency || 'INR';
+        const sum = (k) => events.reduce((s, e) => s + e[k], 0);
+        $('#overview').innerHTML =
+          kpi('calendar', 'Events', events.length) +
+          kpi('ticket', 'Tickets sold', sum('people')) +
+          kpi('rupee', 'Revenue', rupees(sum('revenue'), cur)) +
+          kpi('check', 'Checked in', `${sum('entered')}<span class="muted" style="font-size:15px;font-weight:600"> / ${sum('people')}</span>`);
+        $('#no-events').classList.toggle('hidden', events.length > 0);
+        $('#events-list').innerHTML = events.map((e) => {
+          const d = dateParts(e.startsAt);
+          const past = new Date(e.startsAt) < new Date();
+          const status = !e.isActive ? '<span class="badge">Hidden</span>' : past ? '<span class="badge">Past</span>' : '<span class="badge ok">On sale</span>';
+          return `
+          <article class="aevent">
+            <div class="aevent-media ${e.imageUrl ? 'has-img' : ''}" style="${e.imageUrl ? `background-image:${esc(cssUrl(e.imageUrl))}` : ''}"><div><b>${d.day}</b><small>${esc(d.mon)}</small></div></div>
+            <div class="aevent-body">
+              <div class="row" style="gap:8px"><h3>${esc(e.title)}</h3>${status}</div>
+              <div class="row" style="gap:14px"><span class="meta">${icon('clock')}${esc(fmtDate(e.startsAt))}</span>${e.venue ? `<span class="meta">${icon('pin')}${esc(e.venue)}</span>` : ''}</div>
+              <div class="cat-chips">${e.categories.filter((c) => c.isActive).map((c) => `
+                <div class="cat-chip">
+                  <div class="row"><b style="color:var(--ink)">${esc(c.name)}</b><span class="spacer"></span><span class="muted">${esc(money(c.price, e.currency))}</span></div>
+                  ${c.capacity ? `<div class="progress"><span style="width:${pct(c.sold, c.capacity)}%"></span></div>` : ''}
+                  <span class="muted small">${c.sold}${c.capacity ? ` / ${c.capacity}` : ''} sold</span>
+                </div>`).join('')}
+              </div>
+              <div class="aevent-stats">
+                <span><b>${e.people}</b>${e.capacity ? ` / ${e.capacity}` : ''} people</span>
+                <span><b>${e.bookings}</b> bookings</span>
+                <span><b>${e.entered}</b> entered</span>
+                <span><b>${rupees(e.revenue, e.currency)}</b> revenue</span>
+                ${e.maxPrice ? `<span>${icon('rupee')} via <b>${esc(GATEWAY_NAMES[e.payment] || 'not set up')}</b>${e.paymentGateway ? '' : ' (default)'}</span>` : ''}
+              </div>
+            </div>
+            <div class="aevent-actions">
+              <button class="btn primary sm" data-action="open-bookings" data-id="${e.id}">${icon('list')}Bookings</button>
+              <button class="btn ghost sm" data-action="edit-event" data-id="${e.id}">${icon('edit')}Edit</button>
+            </div>
+          </article>`;
+        }).join('');
+      } catch (err) { showAlert($('#error'), err.message); }
+    }
+
+    const form = $('#event-form');
+    function openEventDialog(e) {
+      editing = e || null;
+      form.reset();
+      form.elements.imageUrl.value = '';   // reset() doesn't clear hidden inputs
+      fillGatewaySelect();
+      $('#ed-error').classList.add('hidden');
+      $('#ed-title').textContent = e ? 'Edit event' : 'New event';
+      $('#ed-delete').classList.toggle('hidden', !e);
+      $('#cats').innerHTML = '';
+      if (e) {
+        for (const k of ['title', 'startsAt', 'venue', 'capacity', 'imageUrl', 'description']) form.elements[k].value = e[k] ?? '';
+        form.elements.isActive.checked = e.isActive;
+        form.elements.paymentGateway.value = e.paymentGateway || '';
+        e.categories.filter((c) => c.isActive).forEach(addCatRow);
+      } else {
+        addCatRow({ name: 'General', price: 0, capacity: 0 });
+      }
+      setImage(form.elements.imageUrl.value);
+      $('#event-dialog').showModal();
+      $('.dlg-body', $('#event-dialog')).scrollTop = 0;
+    }
+
+    // ----- cover image upload -----
+    let uploading = false;
+    function setImage(url) {
+      form.elements.imageUrl.value = url || '';
+      $('#img-preview').hidden = !url;
+      if (url) $('#img-preview').src = url;
+      $('#uploader-empty').classList.toggle('hidden', !!url);
+      $('#img-actions').classList.toggle('hidden', !url);
+      $('#uploader').classList.toggle('has-image', !!url);
+    }
+
+    // Shrink big phone photos before upload (max 1600px, JPEG) so uploads are fast on mobile data.
+    async function compressImage(file, max = 1600) {
+      if (file.type === 'image/gif') return file;
+      const bmp = await createImageBitmap(file).catch(() => null);
+      if (!bmp) return file;
+      const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bmp.width * scale);
+      canvas.height = Math.round(bmp.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.85));
+      return blob && blob.size < file.size ? blob : file;
+    }
+
+    async function uploadImage(file) {
+      if (!file) return;
+      if (!file.type.startsWith('image/')) return showAlert($('#ed-error'), 'Please choose an image file.');
+      uploading = true;
+      $('#uploader-busy').classList.remove('hidden');
+      form.querySelector('button:not([type=button])').disabled = true;
+      try {
+        const blob = await compressImage(file);
+        const res = await fetch('/api/admin/upload', { method: 'POST', headers: { 'Content-Type': blob.type || file.type }, body: blob });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        setImage(data.url);
+        $('#ed-error').classList.add('hidden');
+      } catch (err) {
+        showAlert($('#ed-error'), err.message);
+      } finally {
+        uploading = false;
+        $('#uploader-busy').classList.add('hidden');
+        form.querySelector('button:not([type=button])').disabled = false;
+        $('#img-file').value = '';
+      }
+    }
+
+    $('#img-file').addEventListener('change', (e) => uploadImage(e.target.files[0]));
+    $('#img-remove').addEventListener('click', () => setImage(''));
+    const up = $('#uploader');
+    ['dragenter', 'dragover'].forEach((t) => up.addEventListener(t, (e) => { e.preventDefault(); up.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach((t) => up.addEventListener(t, (e) => { e.preventDefault(); up.classList.remove('drag'); }));
+    up.addEventListener('drop', (e) => uploadImage(e.dataTransfer.files[0]));
+
+    function addCatRow(c = {}) {
+      const row = document.createElement('div');
+      row.className = 'cat-row';
+      row.dataset.id = c.id || '';
+      row.innerHTML = `
+        <div class="cat-name"><label>Name *</label><input class="c-name" required maxlength="60" placeholder="VIP" value="${esc(c.name || '')}"></div>
+        <div><label>Price *</label><input class="c-price" type="number" inputmode="decimal" min="0" step="0.01" required value="${c.price ?? 0}"></div>
+        <div><label>Seats</label><input class="c-cap" type="number" inputmode="numeric" min="0" step="1" value="${c.capacity ?? 0}"></div>
+        <div class="cat-desc"><label>Description</label><input class="c-desc" maxlength="300" placeholder="Front rows, welcome drink" value="${esc(c.description || '')}"></div>
+        <button type="button" class="btn danger-ghost cat-remove" aria-label="Remove category">${icon('trash')}<span class="cat-remove-label">Remove category</span></button>
+        ${c.sold ? `<div class="sold">${c.sold} sold · ${c.entered} entered</div>` : ''}`;
+      $('.cat-remove', row).addEventListener('click', () => {
+        if ($('#cats').children.length === 1) return toast('An event needs at least one ticket category.');
+        if (c.sold && !confirm(`${c.sold} "${c.name}" tickets are already sold. Stop selling this category? Sold tickets stay valid.`)) return;
+        row.remove();
+      });
+      $('#cats').appendChild(row);
+      return row;
+    }
+    $('#add-cat').addEventListener('click', () => { const r = addCatRow(); r.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); $('.c-name', r).focus({ preventScroll: true }); });
+    window.editEvent = (id) => openEventDialog(events.find((e) => e.id === id));
+    window.openEventDialog = openEventDialog;
+    $('#new-event').addEventListener('click', () => openEventDialog());
+    $('#ed-cancel').addEventListener('click', () => $('#event-dialog').close());
+    $('#ed-x').addEventListener('click', () => $('#event-dialog').close());
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      if (uploading) return toast('Please wait for the image to finish uploading');
+      const f = form.elements;
+      const ticketTypes = [...$('#cats').children].map((r) => ({
+        id: Number(r.dataset.id) || null, name: $('.c-name', r).value, price: Number($('.c-price', r).value),
+        capacity: Number($('.c-cap', r).value || 0), description: $('.c-desc', r).value,
+      }));
+      const body = { title: f.title.value, startsAt: f.startsAt.value, venue: f.venue.value, ticketTypes, paymentGateway: f.paymentGateway.value,
+        capacity: Number(f.capacity.value || 0), imageUrl: f.imageUrl.value, description: f.description.value, isActive: f.isActive.checked };
+      try {
+        await api(editing ? `/api/admin/events/${editing.id}` : '/api/admin/events', { method: editing ? 'PUT' : 'POST', body });
+        $('#event-dialog').close();
+        toast(editing ? 'Event updated' : 'Event created');
+        loadEvents();
+      } catch (err) { showAlert($('#ed-error'), err.message); }
+    });
+
+    $('#ed-delete').addEventListener('click', async () => {
+      if (!confirm(`Delete "${editing.title}"? This cannot be undone.`)) return;
+      try { await api(`/api/admin/events/${editing.id}`, { method: 'DELETE' }); $('#event-dialog').close(); toast('Event deleted'); loadEvents(); }
+      catch (err) { showAlert($('#ed-error'), err.message); }
+    });
+
+    // ----- bookings -----
+    window.openBookings = async (id) => {
+      currentEvent = events.find((e) => e.id === id);
+      const e = currentEvent;
+      $('#b-title').textContent = e.title;
+      $('#b-sub').textContent = [fmtDate(e.startsAt), e.venue].filter(Boolean).join(' · ');
+      $('#b-export').href = `/api/admin/events/${id}/export.csv`;
+      $('#b-stats').innerHTML =
+        kpi('list', 'Paid bookings', e.bookings) +
+        kpi('users', 'People', `${e.people}${e.capacity ? `<span class="muted" style="font-size:15px;font-weight:600"> / ${e.capacity}</span>` : ''}`) +
+        kpi('check', 'Entered', `${e.entered}<span class="muted" style="font-size:15px;font-weight:600"> · ${e.people - e.entered} to come</span>`) +
+        kpi('rupee', 'Revenue', rupees(e.revenue, e.currency));
+      $('#b-cats').innerHTML = e.categories.map((c) => `<tr>
+        <td class="primary-cell"><strong style="color:var(--ink)">${esc(c.name)}</strong>${c.isActive ? '' : ' <span class="badge">Not on sale</span>'}</td>
+        <td data-label="Price">${esc(money(c.price, e.currency))}</td>
+        <td data-label="Sold"><div style="display:grid;gap:6px;min-width:110px">${c.sold}${c.capacity ? ` / ${c.capacity}` : ''}${c.capacity ? `<div class="progress"><span style="width:${pct(c.sold, c.capacity)}%"></span></div>` : ''}</div></td>
+        <td data-label="Entered">${c.entered} / ${c.sold}</td>
+        <td data-label="Revenue"><b>${rupees(c.revenue, e.currency)}</b></td>
+      </tr>`).join('');
+      $('#b-search').value = '';
+      showTab('bookings');
+      loadBookings();
+    };
+
+    async function loadBookings() {
+      try {
+        bookings = await api(`/api/admin/events/${currentEvent.id}/bookings?status=${$('#b-status').value}`);
+        renderBookings();
+      } catch (err) { showAlert($('#error'), err.message); }
+    }
+
+    const statusBadge = (s) => `<span class="badge ${s === 'paid' ? 'ok' : s === 'pending' ? 'warn' : 'bad'}">${s}</span>`;
+    const enteredCount = (b) => b.attendees.filter((a) => a.checkedInAt).length;
+    const entryState = (b) => { const n = enteredCount(b); return n === 0 ? 'none' : n === b.attendees.length ? 'all' : 'partial'; };
+    function entryBadge(b) {
+      const n = enteredCount(b), total = b.attendees.length;
+      if (b.status !== 'paid') return '<span class="muted small">—</span>';
+      if (n === 0) return `<span class="badge">${icon('clock')}Not entered</span>`;
+      if (n === total) return `<span class="badge ok">${icon('check')}All entered</span>`;
+      return `<span class="badge warn">${icon('users')}${n} of ${total} entered</span>`;
+    }
+    const personEntry = (a) => a.checkedInAt
+      ? `<span class="badge ok" title="Entered ${esc(fmtDate(a.checkedInAt))} by ${esc(a.checkedInBy)}">${icon('check')}${esc(fmtTime(a.checkedInAt))}</span>`
+      : '<span class="badge">Not entered</span>';
+
+    function renderBookings() {
+      const q = $('#b-search').value.trim().toLowerCase();
+      const entry = $('#b-entry').value;
+      const rows = bookings.filter((b) => (!q || [b.name, b.phone, b.email, b.code, ...b.attendees.map((a) => a.name)].join(' ').toLowerCase().includes(q))
+        && (!entry || (b.status === 'paid' && entryState(b) === entry)));
+      $('#b-empty').classList.toggle('hidden', rows.length > 0);
+      $('#b-body').closest('.table-card').classList.toggle('hidden', !rows.length);
+      $('#b-body').innerHTML = rows.map((b) => {
+        return `<tr class="clickable" data-action="show-booking" data-id="${b.id}">
+          <td data-label="Booking">#${b.id}</td>
+          <td class="primary-cell"><strong style="color:var(--ink)">${esc(b.name)}</strong><div class="names">${esc(b.phone)} · ${esc(b.email)}</div></td>
+          <td data-label="People">
+            <div class="mini-people">${b.attendees.map((a) => `
+              <div class="mini-person ${a.checkedInAt ? 'in' : ''}" title="${a.checkedInAt ? 'Entered ' + esc(fmtDate(a.checkedInAt)) : 'Not entered'}">
+                <span class="dot"></span><span>${esc(a.name)}</span>${a.ticketType ? `<span class="muted">· ${esc(a.ticketType)}</span>` : ''}
+              </div>`).join('')}
+            </div>
+          </td>
+          <td data-label="Amount"><b>${esc(money(b.amount))}</b></td>
+          <td data-label="Payment">${statusBadge(b.status)}</td>
+          <td data-label="Entry">${entryBadge(b)}</td>
+          <td data-label="Ticket">${b.status === 'paid' ? `<a class="btn ghost sm" href="${pageUrl.ticket(b.code)}" target="_blank">${icon('ticket')}Open</a>` : ''}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    window.showBooking = (id) => {
+      const b = bookings.find((x) => x.id === id);
+      $('#bd-title').textContent = `Booking #${b.id}`;
+      const line = (label, value) => value ? `<div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="muted" style="width:110px;flex:none">${label}</span><span style="min-width:0;overflow-wrap:anywhere">${value}</span></div>` : '';
+      $('#bd-body').innerHTML = `
+        <div class="row"><span class="avatar" style="width:46px;height:46px;font-size:16px">${esc(initials(b.name))}</span><div><h3>${esc(b.name)}</h3><span class="muted small">${b.attendees.length} ${b.attendees.length === 1 ? 'person' : 'people'} · ${esc(money(b.amount))}</span></div><span class="spacer"></span>${statusBadge(b.status)}</div>
+        <div style="display:grid;gap:10px;font-size:14px">
+          ${line('Phone', `<a href="tel:${esc(b.phone)}">${esc(b.phone)}</a>`)}
+          ${line('Email', `<a href="mailto:${esc(b.email)}">${esc(b.email)}</a>`)}
+          ${line('Age / gender', `${b.age}${b.gender ? ` · ${esc(b.gender)}` : ''}`)}
+          ${line('Address', esc(b.address))}
+          ${line('Paid on', b.paidAt ? esc(fmtDate(b.paidAt)) : '')}
+          ${line('Paid via', b.status === 'paid' ? esc(GATEWAY_NAMES[b.gateway] || b.gateway || '—') : '')}
+          ${line('Payment ID', b.paymentId ? `<code>${esc(b.paymentId)}</code>` : '')}
+          ${line('Ticket ID', `<code>${esc(b.code)}</code>`)}
+        </div>
+        <div>
+          <h3 style="margin-bottom:4px">People on this ticket</h3>
+          <ul class="people">${b.attendees.map((a) => `
+            <li>
+              <span class="avatar">${esc(initials(a.name))}</span>
+              <span class="who"><strong>${esc(a.name)}</strong><span class="muted small">${a.age}${a.gender ? ', ' + esc(a.gender) : ''}${a.phone ? ' · ' + esc(a.phone) : ''}</span></span>
+              <span class="tags">
+                ${a.ticketType ? `<span class="badge accent">${esc(a.ticketType)} · ${esc(money(a.price))}</span>` : ''}
+                ${personEntry(a)}
+              </span>
+            </li>`).join('')}</ul>
+        </div>
+        ${b.status === 'paid' ? `<a class="btn ghost block" href="${pageUrl.ticket(b.code)}" target="_blank">${icon('ticket')}Open ticket</a>` : ''}`;
+      $('#booking-dialog').showModal();
+    };
+
+    $('#b-status').addEventListener('change', loadBookings);
+    $('#b-search').addEventListener('input', renderBookings);
+    $('#b-entry').addEventListener('change', renderBookings);
+    $('#back').addEventListener('click', () => { showTab('events'); loadEvents(); });
+
+    // ----- staff -----
+    async function loadUsers() {
+      try {
+        const users = await api('/api/admin/users');
+        $('#users-body').innerHTML = users.map((u) => `<tr>
+          <td class="primary-cell"><div class="row" style="flex-wrap:nowrap"><span class="avatar">${esc(initials(u.name))}</span><strong style="color:var(--ink)">${esc(u.name)}</strong></div></td>
+          <td data-label="Username">${esc(u.username)}</td>
+          <td data-label="Role"><span class="badge ${u.role === 'admin' ? 'accent' : ''}">${u.role}</span></td>
+          <td data-label="">${u.id === me.id ? '<span class="muted small">You</span>' : `<button class="btn danger-ghost sm" data-action="delete-user" data-id="${u.id}" data-name="${esc(u.username)}">Remove</button>`}</td>
+        </tr>`).join('');
+      } catch (err) { showAlert($('#error'), err.message); }
+    }
+    window.deleteUser = async (id, username) => {
+      if (!confirm(`Remove ${username}? They will no longer be able to log in.`)) return;
+      try { await api(`/api/admin/users/${id}`, { method: 'DELETE' }); toast('Team member removed'); loadUsers(); } catch (err) { showAlert($('#error'), err.message); }
+    };
+    $('#user-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const f = ev.target.elements;
+      try {
+        await api('/api/admin/users', { body: { name: f.name.value, username: f.username.value, password: f.password.value, role: f.role.value } });
+        ev.target.reset();
+        $('#user-error').classList.add('hidden');
+        toast('Team member added');
+        loadUsers();
+      } catch (err) { showAlert($('#user-error'), err.message); }
+    });
+
+    // ----- password -----
+    document.querySelectorAll('.change-pw').forEach((b) => b.addEventListener('click', () => {
+      $('#pw-form').reset(); $('#pw-error').classList.add('hidden'); $('#pw-dialog').showModal();
+    }));
+    $('#pw-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const f = ev.target.elements;
+      try { await api('/api/me/password', { body: { current: f.current.value, next: f.next.value } }); $('#pw-dialog').close(); toast('Password changed'); }
+      catch (err) { showAlert($('#pw-error'), err.message); }
+    });
+
+    // ----- payment gateways -----
+    const GATEWAY_NAMES = { razorpay: 'Razorpay', cashfree: 'Cashfree', demo: 'Demo (test)', free: 'Free ticket' };
+    let payments = null;
+
+    function fillGatewaySelect() {
+      const sel = form.elements.paymentGateway;
+      const gws = payments?.gateways || [];
+      const def = GATEWAY_NAMES[payments?.default] || 'none set up';
+      sel.innerHTML = `<option value="">Default (${esc(def)})</option>` + gws.map((g) =>
+        `<option value="${g.id}" ${g.configured ? '' : 'disabled'}>${esc(g.label)}${g.configured ? (g.mode === 'test' ? ' — test mode' : '') : ' — not set up'}</option>`).join('');
+    }
+
+    async function loadPayments() {
+      try {
+        payments = await api('/api/admin/payments');
+        const any = payments.gateways.some((g) => g.configured);
+        $('#pay-note').classList.toggle('hidden', any);
+        $('#pay-note').textContent = payments.demoAllowed
+          ? 'No gateway is connected yet, so bookings use DEMO payments (no real money). Add your Razorpay or Cashfree keys to .env to take real payments.'
+          : 'No gateway is connected, so only free events can be booked. Add your Razorpay or Cashfree keys to .env.';
+        $('#gateways').innerHTML = payments.gateways.map((g) => {
+          const isDefault = g.configured && payments.default === g.id;
+          const status = !g.configured ? '<span class="badge">Not set up</span>'
+            : g.mode === 'live' ? `<span class="badge ok">${icon('check')}Live</span>` : '<span class="badge warn">Test mode</span>';
+          const envHelp = g.id === 'razorpay'
+            ? 'RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET'
+            : 'CASHFREE_APP_ID, CASHFREE_SECRET_KEY, CASHFREE_ENV (sandbox / production)';
+          return `
+          <div class="card gw-card ${isDefault ? 'is-default' : ''}">
+            <div class="row" style="flex-wrap:nowrap">
+              <span class="gw-logo ${g.id}">${g.label[0]}</span>
+              <div style="min-width:0;flex:1"><h2>${esc(g.label)}</h2><div class="row" style="gap:6px;margin-top:4px">${status}${isDefault ? '<span class="badge accent">Default</span>' : ''}</div></div>
+            </div>
+            ${g.configured ? `
+              <p class="muted small">${g.eventsUsing ? `Chosen for ${g.eventsUsing} event${g.eventsUsing === 1 ? '' : 's'}. ` : ''}${isDefault ? 'Used for every event that doesn’t pick a gateway.' : ''}</p>
+              <div>
+                <span class="label">Webhook URL ${g.webhookEnabled ? '' : '<span class="badge warn">secret missing</span>'}</span>
+                <div class="copy-row"><code>${esc(g.webhookUrl)}</code><button class="btn ghost sm" data-action="copy" data-text="${esc(g.webhookUrl)}">Copy</button></div>
+                <p class="muted small" style="margin-top:6px">${g.id === 'razorpay' ? 'Events: payment.captured, order.paid' : 'Event: Payment Success (webhook version 2023-08-01)'}</p>
+              </div>
+              ${isDefault ? '' : `<button class="btn primary" data-action="set-default" data-gw="${g.id}">Make default</button>`}`
+            : `<p class="muted small">Add these to <code>.env</code> and restart:<br><code>${envHelp}</code></p>`}
+          </div>`;
+        }).join('');
+      } catch (err) { showAlert($('#error'), err.message); }
+    }
+
+    // Buttons inside rendered lists (no inline onclick: blocked by the Content-Security-Policy).
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-action]');
+      if (!el) return;
+      // A link inside a clickable booking row should just open the link.
+      if (el.tagName === 'TR' && e.target.closest('a[href]')) return;
+      const id = Number(el.dataset.id);
+      switch (el.dataset.action) {
+        case 'new-event': return openEventDialog();
+        case 'open-bookings': return openBookings(id);
+        case 'edit-event': return editEvent(id);
+        case 'show-booking': return showBooking(id);
+        case 'delete-user': return deleteUser(id, el.dataset.name);
+        case 'copy': return navigator.clipboard.writeText(el.dataset.text).then(() => toast('Copied'), () => toast('Copy failed — select the text instead'));
+        case 'set-default':
+          return api('/api/admin/payments', { method: 'PUT', body: { default: el.dataset.gw } })
+            .then(() => { toast(`${GATEWAY_NAMES[el.dataset.gw]} is now the default`); loadPayments(); })
+            .catch((err) => showAlert($('#error'), err.message));
+      }
+    });
+
+    (async () => {
+      me = await requireLogin(['admin']);
+      if (!me) return;
+      document.querySelectorAll('.me-name').forEach((el) => { el.textContent = me.name; });
+      document.querySelectorAll('.me-avatar').forEach((el) => { el.textContent = initials(me.name); });
+      loadEvents();
+      // Needed for the gateway picker in the event form.
+      api('/api/admin/payments').then((p) => { payments = p; }).catch(() => {});
+    })();
+  </script>
+</body>
+</html>

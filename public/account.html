@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141414">
+  <meta name="robots" content="noindex">
+  <title>My account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/" data-brand></a>
+      <nav><a href="/">All events</a><a href="#" data-action="customer-logout">Sign out</a></nav>
+    </div>
+  </header>
+
+  <main class="section">
+    <div class="container" style="max-width:900px">
+      <div id="error" class="alert error hidden"></div>
+
+      <div class="account-head">
+        <span class="avatar" id="avatar"></span>
+        <div style="min-width:0;flex:1">
+          <h1 id="hello">My account</h1>
+          <p class="muted" id="phone"></p>
+        </div>
+        <a class="btn primary" href="/" data-icon="ticket">Book tickets</a>
+      </div>
+
+      <div class="kpis" id="stats" style="grid-template-columns:repeat(3,minmax(0,1fr))"></div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-show="upcoming">Upcoming</button>
+        <button class="tab" data-show="past">Past</button>
+      </div>
+      <div class="booking-list" id="list"></div>
+      <div class="card empty hidden" id="empty"></div>
+    </div>
+  </main>
+
+  <footer class="site-footer"></footer>
+
+  <script src="/common.js"></script>
+  <script>
+    let bookings = [];
+    let show = 'upcoming';
+    const initials = (n) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+    const isPast = (b) => new Date(b.event.startsAt).getTime() + 6 * 3600_000 < Date.now();   // past 6h after start
+
+    function render() {
+      const list = bookings.filter((b) => (show === 'past') === isPast(b));
+      // Upcoming: soonest first. Past: most recent first.
+      list.sort((a, b) => (show === 'past' ? -1 : 1) * (new Date(a.event.startsAt) - new Date(b.event.startsAt)));
+      $('#empty').classList.toggle('hidden', list.length > 0);
+      $('#empty').innerHTML = show === 'upcoming'
+        ? '<h3>No upcoming bookings</h3><p style="margin:6px 0 16px">When you book tickets they will appear here.</p><a class="btn primary" href="/">Browse events</a>'
+        : '<h3>No past events yet</h3>';
+      $('#list').innerHTML = list.map((b) => {
+        const d = dateParts(b.event.startsAt);
+        const total = b.attendees.length;
+        const entered = b.attendees.filter((a) => a.checkedInAt).length;
+        const status = b.status === 'pending'
+          ? '<span class="badge warn">Payment pending</span>'
+          : entered === total ? `<span class="badge ok">${icon('check')}Attended</span>`
+          : entered ? `<span class="badge warn">${entered} of ${total} entered</span>`
+          : isPast(b) ? '<span class="badge">Not attended</span>' : '<span class="badge ok">Confirmed</span>';
+        return `
+        <article class="bcard ${isPast(b) ? 'past' : ''}">
+          <div class="bcard-media ${b.event.imageUrl ? 'has-img' : ''}" style="${b.event.imageUrl ? `background-image:${esc(cssUrl(b.event.imageUrl))}` : ''}"><div><b>${d.day}</b><small>${esc(d.mon)}</small></div></div>
+          <div class="bcard-body">
+            <div class="row" style="gap:8px"><h3>${esc(b.event.title)}</h3>${status}</div>
+            <div class="row" style="gap:14px"><span class="meta">${icon('clock')}${esc(fmtDate(b.event.startsAt))}</span>${b.event.venue ? `<span class="meta">${icon('pin')}${esc(b.event.venue)}</span>` : ''}</div>
+            <div class="bcard-people">${b.attendees.map((a) => `<span class="badge ${a.checkedInAt ? 'ok' : ''}">${esc(a.name)}${a.ticketType ? ` · ${esc(a.ticketType)}` : ''}</span>`).join('')}</div>
+          </div>
+          <div class="bcard-actions">
+            <span><b style="color:var(--ink);font-size:17px">${esc(money(b.amount, b.currency))}</b><br><span class="muted small">${total} ${total === 1 ? 'person' : 'people'}</span></span>
+            ${b.status === 'paid'
+              ? `<a class="btn primary sm" href="${pageUrl.ticket(b.ticketCode)}">${icon('ticket')}View ticket</a>`
+              : `<a class="btn ghost sm" href="${pageUrl.payment(b.ref)}">Check payment</a>`}
+          </div>
+        </article>`;
+      }).join('');
+    }
+
+    document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+      show = t.dataset.show;
+      document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x === t));
+      render();
+    }));
+
+    (async () => {
+      const me = await getCustomer();
+      if (!me) return location.replace(signinUrl());
+      $('#hello').textContent = me.name ? `Hi, ${me.name.split(/\s+/)[0]}` : 'My account';
+      $('#phone').textContent = `+91 ${me.phone.slice(0, 5)} ${me.phone.slice(5)}${me.email ? ' · ' + me.email : ''}`;
+      $('#avatar').textContent = me.name ? initials(me.name) : '';
+      if (!me.name) $('#avatar').innerHTML = icon('user');
+      try {
+        bookings = await api('/api/customer/bookings');
+        const paid = bookings.filter((b) => b.status === 'paid');
+        const kpi = (ic, label, value) => `<div class="kpi"><span class="kpi-label">${icon(ic)}${esc(label)}</span><span class="kpi-value">${value}</span></div>`;
+        $('#stats').innerHTML =
+          kpi('ticket', 'Bookings', paid.length) +
+          kpi('calendar', 'Upcoming', paid.filter((b) => !isPast(b)).length) +
+          kpi('users', 'Tickets', paid.reduce((s, b) => s + b.attendees.length, 0));
+        // Open on "Past" if nothing is coming up but there is history.
+        if (!bookings.some((b) => !isPast(b)) && bookings.length) document.querySelector('[data-show=past]').click();
+        else render();
+      } catch (err) {
+        if (err.status === 401) return location.replace(signinUrl());
+        showAlert($('#error'), err.message);
+      }
+    })();
+  </script>
+</body>
+</html>

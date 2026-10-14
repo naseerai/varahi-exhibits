@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141414">
+  <title>Team login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="auth">
+    <aside class="auth-art">
+      <a class="brand" href="/" data-brand></a>
+      <div>
+        <h2>Run your events. Welcome every guest.</h2>
+        <ul>
+          <li data-icon="grid">Create events with VIP, Gold &amp; General tickets</li>
+          <li data-icon="users">See every booking and every member</li>
+          <li data-icon="scan">Scan QR passes at the gate in seconds</li>
+        </ul>
+      </div>
+      <p class="small" style="color:rgba(255,255,255,.5)">For organisers and entry staff.</p>
+    </aside>
+
+    <main class="auth-form">
+      <div class="inner">
+        <h1 style="font-size:28px">Sign in</h1>
+        <p class="muted" style="margin:6px 0 24px">Use the account your organiser gave you.</p>
+        <div id="error" class="alert error hidden" style="margin-bottom:16px"></div>
+        <form id="form" class="stack">
+          <div><label for="username">Username</label><input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>
+          <div>
+            <label for="password">Password</label>
+            <div style="position:relative">
+              <input id="password" type="password" autocomplete="current-password" required style="padding-right:52px">
+              <button type="button" id="toggle-pw" class="btn icon-only" aria-label="Show password" style="position:absolute;right:4px;top:3px;background:none;color:var(--muted)"></button>
+            </div>
+          </div>
+          <button class="btn primary lg block" id="submit">Sign in</button>
+        </form>
+        <p class="muted small" style="margin-top:24px;text-align:center"><a href="/">← Back to events</a></p>
+      </div>
+    </main>
+  </div>
+
+  <script src="/common.js"></script>
+  <script>
+    const pw = $('#password');
+    const setEye = () => { $('#toggle-pw').innerHTML = icon(pw.type === 'password' ? 'eye' : 'eyeOff'); };
+    setEye();
+    $('#toggle-pw').addEventListener('click', () => { pw.type = pw.type === 'password' ? 'text' : 'password'; setEye(); pw.focus(); });
+
+    $('#form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = $('#submit');
+      btn.disabled = true; btn.textContent = 'Signing in…';
+      try {
+        const me = await api('/api/login', { body: { username: $('#username').value, password: pw.value } });
+        const next = qs('next');
+        location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : me.role === 'admin' ? '/admin' : '/scan';
+      } catch (err) {
+        showAlert($('#error'), err.message);
+        btn.disabled = false; btn.textContent = 'Sign in';
+      }
+    });
+  </script>
+</body>
+</html>

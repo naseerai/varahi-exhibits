@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141414">
+  <title>Your ticket</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/" data-brand></a>
+      <nav><a href="/">All events</a><a href="/signin" data-account-link>Sign in</a></nav>
+    </div>
+  </header>
+
+  <main class="section">
+    <div class="container pass-wrap">
+      <div id="error" class="alert error hidden"></div>
+
+      <div id="success" class="success-banner hidden no-print">
+        <span class="tick" data-icon="check" data-icon-class="lg"></span>
+        <div>You're in! Show this QR code at the entrance.<div class="small" style="font-weight:500;opacity:.85">Save this page or take a screenshot.</div></div>
+      </div>
+
+      <article id="ticket" class="pass hidden">
+        <div class="pass-top">
+          <div class="pass-head">
+            <span class="pass-logo" data-brand></span>
+            <span class="badge dark" style="background:rgba(255,255,255,.14)" id="admits"></span>
+          </div>
+          <h1 id="title"></h1>
+          <div class="pass-info">
+            <div><small>Date</small><b id="date"></b></div>
+            <div><small>Time</small><b id="time"></b></div>
+            <div style="grid-column:1/-1" id="venue-wrap"><small>Venue</small><b id="venue"></b></div>
+          </div>
+        </div>
+        <div class="pass-tear"><i></i><i></i></div>
+        <div class="pass-body">
+          <div class="qr-box"><img id="qr" alt="Ticket QR code"></div>
+          <p class="pass-code">Ticket ID · <span id="code"></span></p>
+          <ul class="people" id="people" style="margin-top:18px"></ul>
+          <p class="muted small" style="margin-top:14px">Booked by <b id="booked-by" style="color:var(--ink)"></b> · Paid <b id="amount" style="color:var(--ink)"></b></p>
+        </div>
+      </article>
+
+      <div class="row no-print hidden" id="actions" style="justify-content:center;margin-top:20px">
+        <button class="btn ghost" data-action="print" data-icon="printer">Print / PDF</button>
+        <a class="btn ghost" id="download" download="ticket-qr.png" data-icon="download">Save QR</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer"></footer>
+
+  <script src="/common.js"></script>
+  <script>
+    (async () => {
+      try {
+        const t = await api(`/api/tickets/${encodeURIComponent(pathPart(1))}`);
+        if (qs('new')) $('#success').classList.remove('hidden');
+        document.title = `Ticket – ${t.event.title}`;
+        $('#title').textContent = t.event.title;
+        $('#date').textContent = fmtDay(t.event.startsAt);
+        $('#time').textContent = fmtTime(t.event.startsAt);
+        $('#venue').textContent = t.event.venue;
+        $('#venue-wrap').classList.toggle('hidden', !t.event.venue);
+        $('#admits').textContent = `Admits ${t.attendees.length} ${t.attendees.length === 1 ? 'person' : 'people'}`;
+        $('#qr').src = t.qr;
+        $('#download').href = t.qr;
+        $('#code').textContent = t.code;
+        $('#people').innerHTML = t.attendees.map((a) => `
+          <li>
+            <span class="avatar">${esc(a.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase())}</span>
+            <span class="who"><strong>${esc(a.name)}</strong><span class="muted small">Age ${a.age}${a.isPrimary ? ' · Booked' : ''}</span></span>
+            <span class="tags">
+              ${a.ticketType ? `<span class="badge accent">${esc(a.ticketType)}</span>` : ''}
+              ${a.checkedInAt ? `<span class="badge ok">Entered ${esc(fmtTime(a.checkedInAt))}</span>` : ''}
+            </span>
+          </li>`).join('');
+        $('#booked-by').textContent = t.name;
+        $('#amount').textContent = money(t.amount, t.currency);
+        $('#ticket').classList.remove('hidden');
+        $('#actions').classList.remove('hidden');
+      } catch (err) { showAlert($('#error'), err.message); }
+    })();
+  </script>
+</body>
+</html>

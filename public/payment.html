@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141414">
+  <meta name="robots" content="noindex">
+  <title>Confirming payment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container"><a class="brand" href="/" data-brand></a></div>
+  </header>
+  <main class="section">
+    <div class="container" style="max-width:480px">
+      <div class="card" style="text-align:center;display:grid;gap:14px;justify-items:center;padding:36px 24px">
+        <span class="spinner" id="spinner"></span>
+        <h1 style="font-size:24px" id="title">Confirming your payment…</h1>
+        <p class="muted" id="msg">Please don't close this page. This usually takes a few seconds.</p>
+        <div class="row hidden" id="actions" style="justify-content:center"></div>
+      </div>
+    </div>
+  </main>
+  <footer class="site-footer"></footer>
+
+  <script src="/common.js"></script>
+  <script>
+    // Customers land here after paying on a bank/UPI page that redirected away from our site.
+    const ref = pathPart(1);
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const done = (title, msg, actions) => {
+      $('#spinner').classList.add('hidden');
+      $('#title').textContent = title;
+      $('#msg').textContent = msg;
+      $('#actions').innerHTML = actions;
+      $('#actions').classList.remove('hidden');
+    };
+    (async () => {
+      if (!ref) return done('Payment not found', 'This link is incomplete.', '<a class="btn primary" href="/">See events</a>');
+      for (let i = 0; i < 12; i++) {
+        try {
+          const s = await api(`/api/bookings/${encodeURIComponent(ref)}/status`);
+          if (s.status === 'paid') return location.replace(`${pageUrl.ticket(s.ticketCode)}?new=1`);
+          if (i >= 3 && s.status === 'cancelled') {
+            return done('Payment not completed', 'No money was taken, or it will be refunded automatically by your bank. You can try booking again.',
+              `<a class="btn primary" href="${pageUrl.event(Number(s.eventId))}">Try again</a>`);
+          }
+        } catch (err) {
+          if (err.status === 404) return done('Payment not found', 'We could not find this booking.', '<a class="btn primary" href="/">See events</a>');
+        }
+        await sleep(2500);
+      }
+      done('Still waiting for the bank', 'If money was deducted, your ticket will be issued automatically within a few minutes. Keep this page link to check again.',
+        `<button class="btn primary" data-action="reload">Check again</button>`);
+    })();
+    document.addEventListener('click', (e) => { if (e.target.closest('[data-action=reload]')) location.reload(); });
+  </script>
+</body>
+</html>

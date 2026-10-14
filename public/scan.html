@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141414">
+  <title>Entry scanner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/vendor/html5-qrcode.min.js"></script>
+</head>
+<body class="scanner">
+  <header class="scan-top">
+    <a class="brand" href="/scan" data-brand></a>
+    <span class="spacer"></span>
+    <a href="/admin" id="admin-link" class="hidden">Admin</a>
+    <button class="link" data-action="logout">Log out</button>
+  </header>
+
+  <main class="scan-main">
+    <div>
+      <label for="event">Checking in for · <span id="who"></span></label>
+      <select id="event"><option value="">Any event</option></select>
+    </div>
+
+    <section id="scan-panel" class="stack">
+      <div class="viewfinder">
+        <div id="reader"></div>
+        <div class="frame"><i></i><i></i><i></i><i></i></div>
+        <div class="laser" id="laser"></div>
+        <div class="cam-msg hidden" id="cam-msg"></div>
+      </div>
+      <p class="scan-hint">Point the camera at the guest's QR code</p>
+      <form id="manual" class="manual">
+        <input id="manual-code" placeholder="Or type the ticket ID" autocapitalize="none" spellcheck="false" aria-label="Ticket ID">
+        <button class="btn primary">Find</button>
+      </form>
+    </section>
+
+    <section id="result" class="stack hidden">
+      <div id="verdict" class="verdict"></div>
+      <div class="scan-card" id="r-card">
+        <h2 id="r-event"></h2>
+        <p class="muted small" id="r-booker" style="margin-top:4px"></p>
+        <div class="scan-stats">
+          <div><b id="r-total"></b><small>on this ticket</small></div>
+          <div><b id="r-entered"></b><small>already entered</small></div>
+        </div>
+        <p class="muted small" id="r-types"></p>
+        <div id="r-people" style="margin-top:6px"></div>
+        <div id="r-error" class="alert error hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="scan-actions">
+        <button class="btn success lg block" id="checkin-selected" data-icon="check">Mark selected as entered</button>
+        <button class="btn ghost lg block" id="next" data-icon="scan">Scan next ticket</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="/common.js"></script>
+  <script>
+    let scanner, current, busy = false;
+    const beep = (ok) => { try {
+      const ctx = new AudioContext(); const o = ctx.createOscillator(); o.frequency.value = ok ? 880 : 220;
+      o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + (ok ? 0.12 : 0.4));
+      navigator.vibrate?.(ok ? 80 : [120, 60, 120]);
+    } catch {} };
+
+    function setVerdict(kind, title, sub = '') {
+      const ic = { ok: 'check', bad: 'ban', warn: 'alert' }[kind];
+      $('#verdict').className = `verdict ${kind}`;
+      $('#verdict').innerHTML = `<span class="v-icon">${icon(ic)}</span><div><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+    }
+
+    function updateButton() {
+      const n = document.querySelectorAll('#r-people input:checked:not(:disabled)').length;
+      $('#checkin-selected').lastChild.textContent = n ? ` Mark ${n} as entered` : ' Select who is entering';
+      $('#checkin-selected').disabled = !n;
+    }
+
+    function render(t) {
+      current = t;
+      const selectedEvent = $('#event').value;
+      const pending = t.attendees.filter((a) => !a.checkedInAt);
+      let canEnter = false;
+      if (t.status !== 'paid') setVerdict('bad', 'Not paid', 'Do not allow entry');
+      else if (selectedEvent && String(t.event.id) !== selectedEvent) setVerdict('bad', 'Wrong event', `This ticket is for ${t.event.title}`);
+      else if (!pending.length) setVerdict('warn', 'Already entered', `All ${t.total} checked in`);
+      else {
+        canEnter = true;
+        setVerdict('ok', 'Valid ticket', t.entered ? `${pending.length} of ${t.total} still to enter` : `${t.total} ${t.total === 1 ? 'person' : 'people'}`);
+      }
+      beep(canEnter);
+
+      $('#r-event').textContent = t.event.title;
+      $('#r-booker').textContent = `Booked by ${t.name} · ${t.phone}`;
+      $('#r-total').textContent = t.total;
+      $('#r-entered').textContent = t.entered;
+      const byType = new Map();
+      for (const a of t.attendees) byType.set(a.ticketType || 'Ticket', (byType.get(a.ticketType || 'Ticket') || 0) + 1);
+      $('#r-types').textContent = [...byType].map(([n, c]) => `${c} × ${n}`).join('  ·  ');
+      $('#r-people').innerHTML = t.attendees.map((a) => `
+        <label class="person ${a.checkedInAt ? 'done' : ''}">
+          <input type="checkbox" value="${a.id}" ${a.checkedInAt ? 'checked disabled' : canEnter ? 'checked' : 'disabled'}>
+          <span class="who"><strong>${esc(a.name)}</strong><span class="muted small">Age ${a.age}${a.gender ? ', ' + esc(a.gender) : ''}${a.isPrimary ? ' · Booked' : ''}</span></span>
+          <span class="tags">
+            ${a.ticketType ? `<span class="badge accent">${esc(a.ticketType)}</span>` : ''}
+            ${a.checkedInAt ? `<span class="badge ok">In ${esc(fmtTime(a.checkedInAt))}</span>` : '<span class="badge">Waiting</span>'}
+          </span>
+        </label>`).join('');
+      document.querySelectorAll('#r-people input').forEach((c) => c.addEventListener('change', updateButton));
+      $('#checkin-selected').classList.toggle('hidden', !canEnter);
+      updateButton();
+      $('#r-error').classList.add('hidden');
+      $('#r-card').classList.remove('hidden');
+      $('#scan-panel').classList.add('hidden');
+      $('#result').classList.remove('hidden');
+      window.scrollTo({ top: 0 });
+    }
+
+    async function lookup(code) {
+      if (busy || !code) return;
+      busy = true;
+      try { scanner?.pause(true); } catch {}
+      try { render(await api('/api/staff/lookup', { body: { code: code.trim() } })); }
+      catch (err) {
+        if (err.status === 401) return logout();
+        beep(false);
+        current = null;
+        setVerdict('bad', 'Invalid ticket', err.message.replace(/^Invalid ticket — /, ''));
+        $('#r-card').classList.add('hidden');
+        $('#checkin-selected').classList.add('hidden');
+        $('#scan-panel').classList.add('hidden');
+        $('#result').classList.remove('hidden');
+      }
+    }
+
+    function resetScan() {
+      busy = false; current = null;
+      $('#result').classList.add('hidden');
+      $('#scan-panel').classList.remove('hidden');
+      $('#manual-code').value = '';
+      try { scanner?.resume(); } catch {}
+    }
+
+    $('#checkin-selected').addEventListener('click', async () => {
+      const ids = [...document.querySelectorAll('#r-people input:checked:not(:disabled)')].map((c) => Number(c.value));
+      if (!ids.length) return;
+      const btn = $('#checkin-selected'); btn.disabled = true;
+      try {
+        const t = await api('/api/staff/checkin', { body: { code: current.code, attendeeIds: ids } });
+        render(t);
+        const left = t.total - t.entered;
+        setVerdict('ok', `${ids.length} marked as entered`, left ? `${left} more on this ticket can enter later` : 'Everyone on this ticket is in');
+      } catch (err) { showAlert($('#r-error'), err.message); btn.disabled = false; }
+    });
+
+    $('#next').addEventListener('click', resetScan);
+    $('#manual').addEventListener('submit', (e) => { e.preventDefault(); lookup($('#manual-code').value); });
+    $('#event').addEventListener('change', () => { try { localStorage.setItem('scanEvent', $('#event').value); } catch {} });
+
+    function camMessage(msg) {
+      $('#cam-msg').textContent = msg;
+      $('#cam-msg').classList.remove('hidden');
+      $('#laser').classList.add('hidden');
+    }
+
+    (async () => {
+      const me = await requireLogin(['admin', 'staff']);
+      if (!me) return;
+      $('#who').textContent = me.name;
+      if (me.role === 'admin') $('#admin-link').classList.remove('hidden');
+
+      const events = await api('/api/staff/events');
+      $('#event').innerHTML += events.map((e) => `<option value="${e.id}">${esc(e.title)} — ${esc(fmtDay(e.startsAt))}</option>`).join('');
+      try { const saved = localStorage.getItem('scanEvent'); if (saved && events.some((e) => String(e.id) === saved)) $('#event').value = saved; } catch {}
+
+      if (!window.Html5Qrcode) return camMessage('Scanner failed to load. Type the ticket ID below instead.');
+      if (!window.isSecureContext) return camMessage('The camera only works over HTTPS. Open this page with an https:// link, or type the ticket ID below.');
+      scanner = new Html5Qrcode('reader');
+      try {
+        await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.64); return { width: s, height: s }; } }, (text) => lookup(text));
+      } catch {
+        camMessage('Could not start the camera. Allow camera access in your browser settings, or type the ticket ID below.');
+      }
+    })();
+  </script>
+</body>
+</html>

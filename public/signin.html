@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141414">
+  <meta name="robots" content="noindex">
+  <title>Sign in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/" data-brand></a>
+      <nav><a href="/">All events</a></nav>
+    </div>
+  </header>
+
+  <main class="section">
+    <div class="container" style="max-width:440px">
+      <div class="card signin-card">
+        <span class="signin-icon" data-icon="shield" data-icon-class="lg"></span>
+
+        <!-- Step 1: mobile number -->
+        <section id="step-phone">
+          <h1>Sign in to book</h1>
+          <p class="muted" style="margin:6px 0 22px">We'll send a one-time code (OTP) to your mobile number. Your tickets and booking history are saved to it.</p>
+          <form id="phone-form" class="stack" novalidate>
+            <div>
+              <label for="phone">Mobile number</label>
+              <div class="phone-input">
+                <span>+91</span>
+                <input id="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="14" placeholder="98765 43210" required>
+              </div>
+            </div>
+            <div id="phone-error" class="alert error hidden"></div>
+            <button class="btn primary lg block" id="send-btn">Send OTP</button>
+          </form>
+        </section>
+
+        <!-- Step 2: OTP -->
+        <section id="step-otp" class="hidden">
+          <h1>Enter the OTP</h1>
+          <p class="muted" style="margin:6px 0 22px">Sent to <b id="sent-to" style="color:var(--ink)"></b> · <button type="button" class="link-btn" id="change">Change number</button></p>
+          <div id="dev-otp" class="alert warn hidden" style="margin-bottom:14px"></div>
+          <form id="otp-form" class="stack" novalidate>
+            <input id="otp" class="otp-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" aria-label="6-digit OTP" required>
+            <div id="otp-error" class="alert error hidden"></div>
+            <button class="btn primary lg block" id="verify-btn">Verify &amp; continue</button>
+          </form>
+          <p style="text-align:center;margin-top:16px"><button type="button" class="link-btn" id="resend" disabled></button></p>
+        </section>
+      </div>    </div>
+  </main>
+
+  <footer class="site-footer"></footer>
+
+  <script src="/common.js"></script>
+  <script>
+    const next = (() => { const n = qs('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : '/account'; })();
+    let phone = '';
+    let timer;
+
+    const digits = (s) => s.replace(/\D/g, '');
+    const tenDigits = (s) => { const d = digits(s); return d.length === 12 && d.startsWith('91') ? d.slice(2) : d.length === 11 && d.startsWith('0') ? d.slice(1) : d; };
+    const pretty = (p) => `+91 ${p.slice(0, 5)} ${p.slice(5)}`;
+
+    function startResendTimer(seconds) {
+      const btn = $('#resend');
+      clearInterval(timer);
+      let left = seconds;
+      const tick = () => {
+        btn.disabled = left > 0;
+        btn.textContent = left > 0 ? `Resend OTP in ${left}s` : 'Resend OTP';
+        if (left-- <= 0) clearInterval(timer);
+      };
+      tick();
+      timer = setInterval(tick, 1000);
+    }
+
+    async function sendOtp(errEl) {
+      const r = await api('/api/auth/otp/send', { body: { phone } });
+      $('#dev-otp').classList.toggle('hidden', !r.devOtp);
+      if (r.devOtp) $('#dev-otp').textContent = `Test mode (SMS not set up): your OTP is ${r.devOtp}`;
+      startResendTimer(r.resendIn || 30);
+      return r;
+    }
+
+    $('#phone-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('#phone-error').classList.add('hidden');
+      const p = tenDigits($('#phone').value);
+      if (!/^[6-9]\d{9}$/.test(p)) return showAlert($('#phone-error'), 'Enter a valid 10-digit mobile number');
+      phone = p;
+      const btn = $('#send-btn');
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        await sendOtp();
+        $('#sent-to').textContent = pretty(phone);
+        $('#step-phone').classList.add('hidden');
+        $('#step-otp').classList.remove('hidden');
+        $('#otp').value = '';
+        $('#otp').focus();
+      } catch (err) {
+        showAlert($('#phone-error'), err.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Send OTP';
+      }
+    });
+
+    async function verify() {
+      const code = digits($('#otp').value);
+      if (code.length !== 6) return showAlert($('#otp-error'), 'Enter the 6-digit OTP');
+      const btn = $('#verify-btn');
+      btn.disabled = true; btn.textContent = 'Verifying…';
+      try {
+        await api('/api/auth/otp/verify', { body: { phone, otp: code } });
+        location.replace(next);
+      } catch (err) {
+        showAlert($('#otp-error'), err.message);
+        $('#otp').select();
+        btn.disabled = false; btn.textContent = 'Verify & continue';
+      }
+    }
+    $('#otp-form').addEventListener('submit', (e) => { e.preventDefault(); verify(); });
+    // Submit automatically once 6 digits are typed or auto-filled from the SMS.
+    $('#otp').addEventListener('input', () => {
+      $('#otp').value = digits($('#otp').value).slice(0, 6);
+      $('#otp-error').classList.add('hidden');
+      if ($('#otp').value.length === 6) verify();
+    });
+
+    $('#resend').addEventListener('click', async () => {
+      $('#otp-error').classList.add('hidden');
+      try { await sendOtp(); toast('New OTP sent'); } catch (err) { showAlert($('#otp-error'), err.message); }
+    });
+    $('#change').addEventListener('click', () => {
+      clearInterval(timer);
+      $('#step-otp').classList.add('hidden');
+      $('#step-phone').classList.remove('hidden');
+      $('#phone').focus();
+    });
+
+    // Already signed in? Go straight on.
+    getCustomer().then((c) => { if (c) location.replace(next); });
+  </script>
+</body>
+</html>

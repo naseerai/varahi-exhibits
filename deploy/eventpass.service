@@ -1,0 +1,32 @@
+# systemd service: keeps the app running, restarts it if it crashes, starts it on boot.
+# Install:  sudo cp deploy/eventpass.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now eventpass
+[Unit]
+Description=EventPass ticketing
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=eventpass
+Group=eventpass
+WorkingDirectory=/opt/eventpass
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning server.js
+Restart=always
+RestartSec=3
+# Settings come from /opt/eventpass/.env (read by the app itself).
+Environment=NODE_ENV=production
+LimitNOFILE=65535
+
+# Hardening: the app can only write to its data folder.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/eventpass
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

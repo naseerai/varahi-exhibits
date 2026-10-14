@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141414">
+  <title>Book tickets</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body data-step="1">
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/" data-brand></a>
+      <nav><a href="/">All events</a><a href="/signin" data-account-link>Sign in</a></nav>
+    </div>
+  </header>
+
+  <section class="event-hero placeholder" id="hero">
+    <div class="container">
+      <a class="back-link" href="/" data-icon="arrowLeft">All events</a>
+      <h1 id="title">&nbsp;</h1>
+      <div class="hero-meta" id="hero-meta"></div>
+    </div>
+  </section>
+
+  <main class="section has-checkout-bar">
+    <div class="container">
+      <div id="error" class="alert error hidden"></div>
+      <div id="soldout" class="alert warn hidden" style="margin-bottom:20px">This event is sold out.</div>
+
+      <form id="form" class="checkout hidden" novalidate>
+        <div class="checkout-main">
+          <ol class="steps" id="steps" aria-label="Booking steps">
+            <li data-step="1"><button type="button" data-goto="1"><span class="step-dot">1</span>Tickets</button></li>
+            <li data-step="2"><button type="button" data-goto="2"><span class="step-dot">2</span>Details</button></li>
+            <li data-step="3"><button type="button" data-goto="3"><span class="step-dot">3</span>Review &amp; pay</button></li>
+          </ol>
+
+          <!-- Step 1: tickets -->
+          <section class="card" id="tickets-card">
+            <div class="step-head">
+              <h2>How many tickets?</h2>
+              <p class="muted small" id="tickets-hint"></p>
+            </div>
+            <div class="tiers" id="types"></div>
+          </section>
+
+          <details class="card about-card" id="about-card">
+            <summary><span>About this event</span><span class="chev" aria-hidden="true"></span></summary>
+            <p class="about" id="description"></p>
+          </details>
+
+          <!-- Step 2: attendee details -->
+          <section class="card hidden" id="details-card">
+            <button type="button" class="back-step" data-goto="1" data-icon="arrowLeft">Change tickets</button>
+            <div class="step-head">
+              <h2>Who's coming?</h2>
+              <p class="muted small" id="details-hint"></p>
+            </div>
+            <div class="fill-progress" aria-hidden="true"><span id="fill-bar"></span></div>
+            <div id="people"></div>
+          </section>
+
+          <!-- Step 3: review & pay -->
+          <section class="card hidden" id="review-card">
+            <button type="button" class="back-step" data-goto="2" data-icon="arrowLeft">Edit details</button>
+            <div class="step-head">
+              <h2>Review your booking</h2>
+              <p class="muted small">Check everything below, then pay to get your QR ticket.</p>
+            </div>
+            <div id="review"></div>
+          </section>
+        </div>
+
+        <aside class="card summary">
+          <div class="summary-event" id="summary-event"></div>
+          <h2 class="summary-title">Your booking</h2>
+          <div class="summary-lines" id="breakdown"></div>
+          <div class="summary-total">
+            <span><b style="color:var(--ink)">Total</b> <span class="muted small" id="count"></span></span>
+            <strong id="total"></strong>
+          </div>
+          <p class="summary-sel" id="summary-sel"></p>
+          <div id="form-error" class="alert error hidden"></div>
+          <button class="btn primary lg block" id="submit">Select tickets</button>
+          <p class="secure" data-icon="shield">Secure checkout · Instant QR ticket</p>
+          <p class="muted small summary-note" id="demo-note" style="text-align:center" hidden>Demo mode — no real money is charged.</p>
+        </aside>
+      </form>
+    </div>
+  </main>
+
+  <dialog id="demo-dialog" class="sm">
+    <div class="dlg">
+      <div class="dlg-head"><h2>Demo payment</h2></div>
+      <div class="dlg-body">
+        <p class="muted">Online payments aren't connected yet, so this simulates a successful payment.</p>
+        <div class="summary-total"><span class="muted">Amount to pay</span><strong id="demo-amount"></strong></div>
+      </div>
+      <div class="dlg-foot">
+        <span class="spacer"></span>
+        <button class="btn ghost" id="demo-cancel">Cancel</button>
+        <button class="btn success" id="demo-pay">Pay now</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- One card per ticket. The first card is the main contact and also asks for email & address. -->
+  <template id="person-tpl">
+    <div class="member">
+      <div class="member-head">
+        <span class="avatar"></span>
+        <div style="min-width:0"><h3 class="p-title"></h3><span class="muted small p-role"></span></div>
+        <span class="spacer"></span>
+        <span class="p-status"></span>
+      </div>
+      <div class="p-ticket"></div>
+      <div class="form-grid">
+        <div class="full"><label>Full name *</label><input name="name" required placeholder="As on ID card"></div>
+        <div><label class="p-phone-label">Mobile number *</label><input name="phone" type="tel" inputmode="tel"></div>
+        <div class="primary-only"><label>Email *</label><input name="email" type="email" inputmode="email" placeholder="you@example.com"></div>
+        <div><label>Age *</label><input name="age" type="number" inputmode="numeric" min="1" max="120" required></div>
+        <div><label>Gender</label>
+          <select name="gender"><option value="">Prefer not to say</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select>
+        </div>
+        <div class="full primary-only"><label>Address *</label><textarea name="address" rows="2"></textarea></div>
+      </div>
+    </div>
+  </template>
+
+  <footer class="site-footer"></footer>
+
+  <script src="/common.js"></script>
+  <script>
+    let event, config;
+    let customer = null;   // signed-in customer (mobile verified by OTP)
+    let step = 1;          // 1 = choose tickets, 2 = attendee details, 3 = review & pay
+    const peopleEl = $('#people');
+    const typeById = (id) => event.ticketTypes.find((t) => String(t.id) === String(id));
+    const cards = () => [...peopleEl.children];
+    const qtyOf = (typeId) => cards().filter((c) => c.dataset.type === String(typeId)).length;
+    const maxPeople = () => config.maxMembers + 1;
+    const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+    const initials = (name) => name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+    const GENDERS = { male: 'Male', female: 'Female', other: 'Other' };
+
+    // "2 × Gold, 1 × VIP"
+    function selectionText() {
+      const groups = new Map();
+      for (const c of cards()) groups.set(c.dataset.type, (groups.get(c.dataset.type) || 0) + 1);
+      return [...groups].map(([id, q]) => `${q} × ${typeById(id)?.name}`).join(', ');
+    }
+    const orderTotal = () => cards().reduce((s, c) => s + (typeById(c.dataset.type)?.price || 0), 0);
+
+    // ----- person cards -----
+    function makeCard(typeId) {
+      const node = $('#person-tpl').content.firstElementChild.cloneNode(true);
+      node.dataset.type = typeId;
+      return node;
+    }
+
+    // Card 1 is the main contact (email + address, ticket goes to them); others only need name & age.
+    function relabel() {
+      cards().forEach((node, i) => {
+        const primary = i === 0;
+        const t = typeById(node.dataset.type);
+        $('.p-title', node).textContent = primary ? 'You — main contact' : `Person ${i + 1}`;
+        $('.p-role', node).textContent = primary ? 'The tickets are sent to you' : 'Name and age are needed at entry';
+        $('.p-ticket', node).innerHTML = t ? `${icon('ticket')}<span>${esc(t.name)} ticket</span><b>${esc(money(t.price, event.currency))}</b>` : '';
+        node.querySelectorAll('.primary-only').forEach((el) => el.classList.toggle('hidden', !primary));
+        for (const n of ['email', 'address']) $(`[name=${n}]`, node).required = primary;
+        // The main contact's mobile is the number verified by OTP and can't be changed here.
+        const phoneInput = $('[name=phone]', node);
+        phoneInput.required = primary;
+        if (primary && customer) { phoneInput.value = `+91 ${customer.phone}`; phoneInput.readOnly = true; }
+        else if (phoneInput.readOnly) { phoneInput.value = ''; phoneInput.readOnly = false; }
+        node.querySelectorAll('input').forEach((f) => { f.enterKeyHint = 'next'; });
+        $('.p-phone-label', node).innerHTML = primary
+          ? `Mobile number${customer ? `<span class="verified">${icon('check')}Verified</span>` : ' *'}`
+          : 'Mobile <span class="muted">(optional)</span>';
+        const auto = { name: 'name', phone: 'tel', email: 'email', address: 'street-address' };
+        for (const [n, v] of Object.entries(auto)) $(`[name=${n}]`, node).autocomplete = primary ? v : 'off';
+      });
+      updateProgress();
+      updateSummary();
+    }
+
+    // Tick each person's card once their required fields are filled in, and show overall progress.
+    const isComplete = (node) => [...node.querySelectorAll('[required]')].every((f) => f.checkValidity());
+    function updateProgress() {
+      const all = cards();
+      let done = 0;
+      all.forEach((node, i) => {
+        const ok = isComplete(node);
+        if (ok) done++;
+        node.classList.toggle('done', ok);
+        $('.p-status', node).innerHTML = ok ? `${icon('check')}Done` : 'To fill';
+        const name = $('input[name=name]', node).value.trim();
+        $('.avatar', node).innerHTML = ok ? icon('check') : name ? esc(initials(name)) : i + 1;
+      });
+      $('#details-hint').textContent = all.length === 1 ? 'Just your details and we\'re done.'
+        : `${done} of ${all.length} people filled in`;
+      $('#fill-bar').style.width = all.length ? `${(done / all.length) * 100}%` : '0';
+    }
+    peopleEl.addEventListener('input', updateProgress);
+    peopleEl.addEventListener('change', updateProgress);
+
+    function addTicket(typeId) {
+      peopleEl.appendChild(makeCard(typeId));
+      refresh();
+    }
+
+    function removeTicket(typeId) {
+      const all = cards();
+      const mine = all.filter((c) => c.dataset.type === String(typeId));
+      if (!mine.length) return;
+      let victim = mine[mine.length - 1];
+      // Never throw away the main contact's details: give them another guest's ticket type instead.
+      if (victim === all[0] && all.length > 1) {
+        const other = all[all.length - 1];
+        all[0].dataset.type = other.dataset.type;
+        victim = other;
+      }
+      victim.remove();
+      refresh();
+    }
+
+    // ----- ticket type cards -----
+    function renderTiers() {
+      const total = cards().length;
+      const topPrice = Math.max(...event.ticketTypes.map((t) => t.price));
+      $('#types').innerHTML = event.ticketTypes.map((t) => {
+        const q = qtyOf(t.id);
+        const soldOut = t.seatsLeft === 0;
+        const canAdd = !soldOut && total < maxPeople() && (t.seatsLeft === null || q < t.seatsLeft);
+        return `
+        <div class="tier selectable ${q ? 'selected' : ''} ${soldOut ? 'soldout' : ''}" data-id="${t.id}" ${soldOut ? '' : 'role="button" tabindex="0"'}>
+          <span class="tier-icon">${icon(t.price === topPrice && event.ticketTypes.length > 1 ? 'crown' : 'ticket')}</span>
+          <div class="tier-text">
+            <h3>${esc(t.name)}</h3>
+            ${t.description ? `<p class="muted small">${esc(t.description)}</p>` : ''}
+            <div class="tier-price-line"><span class="pp"><b>${esc(money(t.price, event.currency))}</b>${t.price ? '<span class="muted small"> / person</span>' : ''}</span>
+              ${soldOut ? '<span class="badge bad">Sold out</span>' : t.seatsLeft !== null && t.seatsLeft <= 20 ? `<span class="badge warn">Only ${t.seatsLeft} left</span>` : ''}</div>
+          </div>
+          <div class="qty">
+            ${soldOut ? '' : `<div class="stepper ${q ? '' : 'empty'}">
+                   <button type="button" data-act="minus" aria-label="One less ${esc(t.name)}" ${q ? '' : 'disabled'}>${icon('minus')}</button>
+                   <span aria-live="polite">${q}</span>
+                   <button type="button" data-act="add" aria-label="One more ${esc(t.name)}" ${canAdd ? '' : 'disabled'}>${icon('plus')}</button>
+                 </div>`}
+          </div>
+        </div>`;
+      }).join('');
+      const left = maxPeople() - total;
+      $('#tickets-hint').textContent = !total ? 'Tap + to add one ticket per person coming.'
+        : `${plural(total, 'ticket')} selected — one per person`
+          + (left === 0 ? ' · maximum per booking' : left <= 3 ? ` · ${left} more allowed` : '');
+    }
+
+    // Close the on-screen keyboard (e.g. when switching from typing to choosing tickets).
+    function closeKeyboard() {
+      const el = document.activeElement;
+      if (el && el.matches('input, textarea, select')) el.blur();
+    }
+
+    $('#types').addEventListener('click', (e) => {
+      const tier = e.target.closest('.tier');
+      if (!tier || tier.classList.contains('soldout')) return;
+      closeKeyboard();
+      const id = tier.dataset.id;
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (e.target.closest('[data-act]')?.disabled) return;
+      if (act === 'minus') return removeTicket(id);
+      if (act === 'add' || (!act && qtyOf(id) === 0)) addTicket(id);
+    });
+    $('#types').addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('tier')) { e.preventDefault(); e.target.click(); }
+    });
+
+    // Mobile typing helpers:
+    // - hide the fixed checkout bar while typing so it doesn't cover the field above the keyboard
+    // - keep the focused field visible once the keyboard has opened
+    // - Enter/Next moves to the next field instead of submitting the whole form
+    const fieldSel = 'input:not([readonly]):not([type=hidden]), select, textarea';
+    peopleEl.addEventListener('focusin', (e) => {
+      if (!e.target.matches(fieldSel)) return;
+      document.body.classList.add('typing');
+      setTimeout(() => {
+        if (document.activeElement === e.target) e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    });
+    peopleEl.addEventListener('focusout', () => {
+      // Wait a tick: focus may just be moving to the next field.
+      setTimeout(() => { if (!peopleEl.contains(document.activeElement)) document.body.classList.remove('typing'); }, 100);
+    });
+    peopleEl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA' || !e.target.matches(fieldSel)) return;
+      e.preventDefault();
+      const fields = [...peopleEl.querySelectorAll(fieldSel)].filter((f) => f.offsetParent !== null);
+      const next = fields[fields.indexOf(e.target) + 1];
+      next ? next.focus() : closeKeyboard();
+    });
+
+    // Booking needs a signed-in customer. The ticket selection is kept while they sign in.
+    const selKey = () => `booking-selection:${event.id}`;
+    function goSignIn() {
+      try { sessionStorage.setItem(selKey(), JSON.stringify(cards().map((c) => c.dataset.type))); } catch { /* storage blocked */ }
+      location.href = signinUrl(`${pageUrl.event(event.id, event.title)}?resume=1`);
+    }
+    function restoreSelection() {
+      let saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem(selKey()) || 'null'); sessionStorage.removeItem(selKey()); } catch { /* ignore */ }
+      if (!Array.isArray(saved)) return false;
+      peopleEl.innerHTML = '';
+      for (const id of saved.slice(0, maxPeople())) if (typeById(id) && typeById(id).seatsLeft !== 0) peopleEl.appendChild(makeCard(id));
+      return cards().length > 0;
+    }
+    // Fill the main contact from the customer's last booking.
+    function prefillPrimary() {
+      const first = cards()[0];
+      if (!first || !customer) return;
+      for (const k of ['name', 'email', 'address']) {
+        const el = $(`[name=${k}]`, first);
+        if (!el.value && customer[k]) el.value = customer[k];
+      }
+    }
+
+    // ----- steps -----
+    // Each step gets its own history entry, so the phone's back button goes to the previous step.
+    // Everything entered is kept when moving between steps.
+    function showStep(n) {
+      step = n;
+      closeKeyboard();
+      refresh();
+      if (n === 3) renderReview();
+      window.scrollTo({ top: $('#form').getBoundingClientRect().top + scrollY - 90 });
+    }
+    function goForward(n) {
+      if (history.state?.step !== n) history.pushState({ step: n }, '');
+      showStep(n);
+    }
+    // Go back to an earlier step, using browser history when it matches so Back/Forward stay in sync.
+    function goBack(n) {
+      if (n >= step) return;
+      if (history.state?.step === step) history.go(n - step);   // popstate switches the step
+      else { history.replaceState({ step: n }, ''); showStep(n); }
+    }
+    window.addEventListener('popstate', () => {
+      const target = history.state?.step || 1;
+      if (target === 1 || !cards().length || !customer) return showStep(1);
+      if (target === 3 && !firstInvalidField()) return showStep(3);
+      showStep(2);
+    });
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-goto]');
+      if (btn) goBack(Number(btn.dataset.goto));
+    });
+
+    async function openDetails() {
+      if (!cards().length) {
+        $('#tickets-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return toast('Add at least one ticket first');
+      }
+      customer = await getCustomer();
+      if (!customer) return goSignIn();
+      prefillPrimary();
+      goForward(2);
+    }
+
+    const firstInvalidField = () => peopleEl.querySelector(':invalid');
+    function openReview() {
+      const bad = firstInvalidField();
+      if (bad) {
+        // Make sure the error tooltip appears after the keyboard has settled.
+        bad.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => bad.reportValidity(), 300);
+        return;
+      }
+      goForward(3);
+    }
+
+    function refresh() {
+      renderTiers();
+      if (!cards().length) step = 1;
+      document.body.dataset.step = step;
+      $('#tickets-card').classList.toggle('hidden', step !== 1);
+      $('#about-card').classList.toggle('hidden', step !== 1 || !event.description);
+      $('#details-card').classList.toggle('hidden', step !== 2);
+      $('#review-card').classList.toggle('hidden', step !== 3);
+      $('#steps').dataset.current = step;
+      document.querySelectorAll('#steps [data-goto]').forEach((b) => { b.disabled = Number(b.dataset.goto) >= step; });
+      relabel();
+    }
+
+    function updateSummary() {
+      const chosen = cards().map((c) => typeById(c.dataset.type)).filter(Boolean);
+      const groups = new Map();
+      for (const t of chosen) groups.set(t, (groups.get(t) || 0) + 1);
+      $('#breakdown').innerHTML = chosen.length
+        ? [...groups].map(([t, n]) => `<div class="row"><span>${n} × ${esc(t.name)} <span class="muted small">@ ${esc(money(t.price, event.currency))}</span></span><span class="spacer"></span><span style="font-weight:600">${esc(money(t.price * n, event.currency))}</span></div>`).join('')
+        : '<p class="muted">No tickets selected yet.</p>';
+      $('#count').textContent = chosen.length ? `· ${plural(chosen.length, 'person', 'people')}` : '';
+      $('#summary-sel').textContent = chosen.length ? selectionText() : 'No tickets selected yet';
+      const total = orderTotal();
+      $('#total').textContent = chosen.length ? money(total, event.currency) : amount(0, event.currency);
+      const btn = $('#submit');
+      if (!btn.dataset.busy) {
+        btn.textContent = !chosen.length ? 'Add tickets'
+          : step === 1 ? 'Continue'
+          : step === 2 ? 'Review booking'
+          : total ? `Pay ${money(total, event.currency)}` : 'Confirm free booking';
+      }
+      btn.classList.toggle('disabled', !chosen.length);
+    }
+
+    // ----- step 3: review -----
+    function renderReview() {
+      const people = cards().map(readPerson);
+      const [main] = people;
+      const total = orderTotal();
+      const row = (ic, html) => `<div class="review-line">${icon(ic)}<span>${html}</span></div>`;
+      $('#review').innerHTML = `
+        <div class="review-block review-event">
+          <h3>${esc(event.title)}</h3>
+          ${row('calendar', `${esc(fmtDay(event.startsAt))} · ${esc(fmtTime(event.startsAt))}`)}
+          ${event.venue ? row('pin', esc(event.venue)) : ''}
+        </div>
+
+        <div class="review-block">
+          <div class="review-head"><h3>${plural(people.length, 'attendee')}</h3><button type="button" class="link-btn" data-goto="2">Edit</button></div>
+          <ul class="review-people">
+            ${people.map((p, i) => {
+              const t = typeById(p.ticketTypeId);
+              const info = [p.age && `${p.age} yrs`, GENDERS[p.gender], i === 0 && 'Main contact'].filter(Boolean).join(' · ');
+              return `<li>
+                <span class="avatar">${esc(initials(p.name))}</span>
+                <div class="rp-text"><b>${esc(p.name)}</b><span class="muted small">${esc(info)}</span></div>
+                <div class="rp-price"><span class="badge accent">${esc(t?.name)}</span><b>${esc(money(t?.price || 0, event.currency))}</b></div>
+              </li>`;
+            }).join('')}
+          </ul>
+        </div>
+
+        <div class="review-block">
+          <div class="review-head"><h3>Tickets will be sent to</h3><button type="button" class="link-btn" data-goto="2">Edit</button></div>
+          ${row('user', esc(main.name))}
+          ${row('phone', `${esc(main.phone)} <span class="verified">${icon('check')}Verified</span>`)}
+          ${row('mail', esc(main.email))}
+          ${main.address ? row('pin', esc(main.address)) : ''}
+        </div>
+
+        <div class="review-block review-total">
+          <div class="summary-lines">${$('#breakdown').innerHTML}</div>
+          <div class="summary-total"><span><b style="color:var(--ink)">Total to pay</b></span><strong>${esc(total ? money(total, event.currency) : 'Free')}</strong></div>
+        </div>`;
+    }
+
+    // ----- payment -----
+    function readPerson(root) {
+      const val = (n) => root.querySelector(`[name=${n}]`)?.value.trim() ?? '';
+      return { ticketTypeId: Number(root.dataset.type), name: val('name'), phone: val('phone'), email: val('email'),
+        age: Number(val('age')), gender: val('gender'), address: val('address') };
+    }
+
+    function finish(ticketCode) { location.href = `${pageUrl.ticket(ticketCode)}?new=1`; }
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('Could not load the payment window. Check your internet connection.'));
+        document.head.appendChild(s);
+      });
+    }
+
+    const releaseSeats = (ref) => api(`/api/bookings/${encodeURIComponent(ref)}/cancel`, { method: 'POST' }).catch(() => {});
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    // If the browser missed the confirmation (network drop), the server may still get it from the
+    // Razorpay webhook — check a few times before giving up.
+    async function waitForPaid(ref, tries = 6) {
+      for (let i = 0; i < tries; i++) {
+        const s = await api(`/api/bookings/${encodeURIComponent(ref)}/status`).catch(() => null);
+        if (s?.status === 'paid') return s;
+        await sleep(2500);
+      }
+      return null;
+    }
+
+    async function payWithRazorpay(b) {
+      if (!window.Razorpay) await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+      return new Promise((resolve, reject) => {
+        let done = false;
+        const rzp = new Razorpay({
+          key: b.checkout.keyId, order_id: b.checkout.orderId, amount: b.checkout.amountPaise, currency: b.checkout.currency,
+          name: b.checkout.eventTitle, description: 'Event tickets', prefill: b.checkout.prefill, theme: { color: '#98020e' },
+          timeout: b.checkout.timeout, retry: { enabled: true, max_count: 3 },
+          handler: async (resp) => {
+            done = true;
+            try { resolve(await api(`/api/bookings/${encodeURIComponent(b.ref)}/verify`, { body: resp })); }
+            catch (e) {
+              const paid = await waitForPaid(b.ref);
+              paid ? resolve(paid) : reject(e);
+            }
+          },
+          modal: {
+            confirm_close: true,
+            ondismiss: async () => {
+              if (done) return;
+              // A UPI/bank payment may still complete after the window closes.
+              const paid = await waitForPaid(b.ref, 2);
+              if (paid) return resolve(paid);
+              releaseSeats(b.ref);
+              reject(new Error('Payment was cancelled. Your details are kept — you can try again.'));
+            },
+          },
+        });
+        rzp.on('payment.failed', () => { /* Razorpay shows the error and lets the customer retry */ });
+        rzp.open();
+      });
+    }
+
+    // Cashfree checkout opens as a pop-up on this page. Some banks redirect to their own page
+    // instead; they come back to /payment/REF, which confirms the payment.
+    async function payWithCashfree(b) {
+      if (!window.Cashfree) await loadScript('https://sdk.cashfree.com/js/v3/cashfree.js');
+      const cf = Cashfree({ mode: b.checkout.mode });
+      const result = await cf.checkout({ paymentSessionId: b.checkout.paymentSessionId, redirectTarget: '_modal' });
+      if (result?.redirect) return new Promise(() => {});   // the browser is leaving for the bank page
+      if (result?.error) {
+        const paid = await waitForPaid(b.ref, 2);
+        if (paid) return paid;
+        releaseSeats(b.ref);
+        throw new Error(result.error.message ? `${result.error.message}. Your details are kept — you can try again.` : 'Payment was cancelled. Your details are kept — you can try again.');
+      }
+      // Pop-up finished: confirm with our server (which double-checks with Cashfree).
+      try { return await api(`/api/bookings/${encodeURIComponent(b.ref)}/verify`, { method: 'POST' }); }
+      catch (e) { const paid = await waitForPaid(b.ref); if (paid) return paid; throw e; }
+    }
+
+    function payDemo(b) {
+      const dlg = $('#demo-dialog');
+      $('#demo-amount').textContent = money(b.amount, b.currency);
+      return new Promise((resolve, reject) => {
+        $('#demo-cancel').onclick = () => { dlg.close(); releaseSeats(b.ref); reject(new Error('Payment was cancelled.')); };
+        $('#demo-pay').onclick = async () => {
+          try { const r = await api(`/api/bookings/${encodeURIComponent(b.ref)}/demo-pay`, { method: 'POST' }); dlg.close(); resolve(r); }
+          catch (e) { dlg.close(); reject(e); }
+        };
+        dlg.showModal();
+      });
+    }
+
+    $('#form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = $('#form-error');
+      errEl.classList.add('hidden');
+      if (step === 1) return openDetails();
+      if (step === 2) return openReview();
+      if (firstInvalidField()) return goBack(2);
+
+      const btn = $('#submit');
+      btn.disabled = true; btn.dataset.busy = '1'; btn.textContent = 'Please wait…';
+      try {
+        const [primary, ...members] = cards().map(readPerson);
+        const booking = await api('/api/bookings', { body: { eventId: event.id, primary, members } });
+        if (booking.status === 'paid') return finish(booking.ticketCode);
+        const pay = { razorpay: payWithRazorpay, cashfree: payWithCashfree, demo: payDemo }[booking.mode];
+        if (!pay) throw new Error('Online payment is not available right now. Please try again later.');
+        const result = await pay(booking);
+        finish(result.ticketCode);
+      } catch (err) {
+        if (err.status === 401) return goSignIn();   // session expired: sign in again, selection is kept
+        showAlert(errEl, err.message);
+        btn.disabled = false; delete btn.dataset.busy;
+        updateSummary();
+      }
+    });
+
+    (async () => {
+      try {
+        // Booking needs an account: sign in with OTP first, then come back here.
+        customer = await getCustomer();
+        if (!customer) return location.replace(signinUrl(location.pathname));
+        [event, config] = await Promise.all([api(`/api/events/${encodeURIComponent(pathPart(1))}`), api('/api/config')]);
+        // Show the readable address, e.g. /events/12/sample-music-night (query kept for ?resume).
+        const nice = pageUrl.event(event.id, event.title);
+        if (location.pathname !== nice) history.replaceState(history.state, '', nice + location.search);
+        document.title = event.title;
+        if (event.imageUrl) { $('#hero').classList.remove('placeholder'); $('#hero').style.backgroundImage = cssUrl(event.imageUrl); }
+        $('#title').textContent = event.title;
+        $('#hero-meta').innerHTML = [
+          `<span>${icon('calendar')}${esc(fmtDay(event.startsAt))}</span>`,
+          `<span>${icon('clock')}${esc(fmtTime(event.startsAt))}</span>`,
+          event.venue && `<span>${icon('pin')}${esc(event.venue)}</span>`,
+          event.seatsLeft !== null && event.seatsLeft > 0 && event.seatsLeft <= 50 && `<span>${icon('users')}${event.seatsLeft} seats left</span>`,
+        ].filter(Boolean).join('');
+        // Event recap at the top of the desktop summary, so the date and venue stay in view on every step.
+        $('#summary-event').innerHTML = `<b>${esc(event.title)}</b>
+          <span>${icon('calendar')}${esc(fmtDay(event.startsAt))} · ${esc(fmtTime(event.startsAt))}</span>
+          ${event.venue ? `<span>${icon('pin')}${esc(event.venue)}</span>` : ''}`;
+        $('#description').textContent = event.description;
+        $('#about-card').open = matchMedia('(min-width: 961px)').matches;
+        $('#demo-note').hidden = !(event.maxPrice && event.payment === 'demo');
+        if (event.seatsLeft === 0) return $('#soldout').classList.remove('hidden');
+        $('#form').classList.remove('hidden');
+        // With a single ticket type there is nothing to choose: start with one ticket.
+        const available = event.ticketTypes.filter((t) => t.seatsLeft !== 0);
+        const resumed = restoreSelection();
+        if (!resumed && event.ticketTypes.length === 1 && available.length) peopleEl.appendChild(makeCard(available[0].id));
+        history.replaceState({ step: 1 }, '');
+        refresh();
+        // Back from sign-in: go straight to the details step.
+        if (resumed && customer && qs('resume')) {
+          history.replaceState({ step: 1 }, '', pageUrl.event(event.id, event.title));
+          openDetails();
+        }
+      } catch (err) { showAlert($('#error'), err.message); }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141414">
+  <title>Upcoming events</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header on-dark">
+    <div class="container">
+      <a class="brand" href="/" data-brand></a>
+      <nav><a href="#browse">Events</a><a href="/signin" data-account-link>Sign in</a></nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <h1>Your next <em>unforgettable night</em> starts here.</h1>
+      <p class="lead">Book tickets for you and your group in under a minute. Pay securely and get an instant QR pass for entry.</p>
+      <div class="hero-search">
+        <span data-icon="search"></span>
+        <input id="search" type="search" placeholder="Search events or venues" aria-label="Search events">
+      </div>
+      <div class="hero-pills">
+        <span>Instant QR tickets</span><span>Group bookings</span><span>Secure payments</span>
+      </div>
+    </div>
+  </section>
+
+  <main class="section" id="browse">
+    <div class="container">
+      <div class="section-head">
+        <div><h2 style="font-size:26px">Upcoming events</h2><p class="muted" id="count"></p></div>
+      </div>
+      <div id="error" class="alert error hidden"></div>
+      <div id="events" class="event-grid"></div>
+      <div id="empty" class="empty hidden"></div>
+    </div>
+  </main>
+
+  <footer class="site-footer"></footer>
+
+  <script src="/common.js"></script>
+  <script>
+    let events = [];
+    let customer = null;   // signed in? Event cards then open the booking page directly, otherwise sign-in first.
+
+    function priceLabel(e) {
+      if (e.maxPrice > e.price) return e.price ? `<small>From</small> ${esc(money(e.price, e.currency))}` : `Free <small>– ${esc(money(e.maxPrice, e.currency))}</small>`;
+      return esc(money(e.price, e.currency));
+    }
+
+    function render() {
+      const q = $('#search').value.trim().toLowerCase();
+      const list = events.filter((e) => !q || `${e.title} ${e.venue}`.toLowerCase().includes(q));
+      $('#count').textContent = events.length ? `${list.length} event${list.length === 1 ? '' : 's'}` : '';
+      $('#empty').classList.toggle('hidden', list.length > 0);
+      $('#empty').innerHTML = events.length
+        ? `<h3>No events match “${esc(q)}”</h3><p>Try a different search.</p>`
+        : `<h3>No upcoming events right now</h3><p>Check back soon — new events are added regularly.</p>`;
+      $('#events').innerHTML = list.map((e) => {
+        const d = dateParts(e.startsAt);
+        const status = e.seatsLeft === 0 ? '<span class="badge bad">Sold out</span>'
+          : e.seatsLeft !== null && e.seatsLeft <= 20 ? `<span class="badge warn">Only ${e.seatsLeft} left</span>` : '';
+        return `
+        <a class="ecard" href="${esc(customer ? pageUrl.event(e.id, e.title) : signinUrl(pageUrl.event(e.id, e.title)))}">
+          <div class="ecard-media ${e.imageUrl ? '' : 'placeholder'}" data-initial="${esc(e.title.charAt(0))}" style="${e.imageUrl ? `background-image:${esc(cssUrl(e.imageUrl))}` : ''}">
+            <div class="date-chip"><b>${d.day}</b><small>${esc(d.mon)}</small></div>
+            ${status}
+          </div>
+          <div class="ecard-body">
+            <h3>${esc(e.title)}</h3>
+            <div class="meta">${icon('clock')}<span>${esc(fmtDate(e.startsAt))}</span></div>
+            ${e.venue ? `<div class="meta">${icon('pin')}<span>${esc(e.venue)}</span></div>` : ''}
+            <div class="ecard-foot">
+              <span class="price">${priceLabel(e)}</span>              <span class="go">${icon('arrowRight')}</span>
+            </div>
+          </div>
+        </a>`;
+      }).join('');
+    }
+
+    $('#search').addEventListener('input', render);
+    $('#search').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#browse').scrollIntoView({ behavior: 'smooth' }); });
+
+    (async () => {
+      try { [events, customer] = await Promise.all([api('/api/events'), getCustomer()]); render(); }
+      catch (err) { showAlert($('#error'), err.message); }
+    })();
+  </script>
+</body>
+</html>
